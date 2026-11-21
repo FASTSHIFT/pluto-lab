@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pluto-lab"
+version = "0.1.0"
+description = "SDR tools for ADALM-PLUTO: spectrum scan, FM/AM demod, ADS-B decode and a tar1090 frontend"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = ["numpy>=1.23"]
+
+[project.optional-dependencies]
+# SDR driver; needs the libiio DLL, see scripts/setup_windows.py
+sdr = ["pyadi-iio==0.0.21", "pylibiio==0.25"]
+# Audio filtering and plotting
+full = ["pyadi-iio==0.0.21", "pylibiio==0.25", "scipy>=1.10", "matplotlib>=3.6"]
+dev = ["pytest>=7.0", "pytest-cov>=4.1", "ruff>=0.4"]
+
+[tool.setuptools]
+packages = ["sdr"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["sdr"]
+# sdr/source.py is the hardware capture loop; it cannot run without a Pluto,
+# so it is excluded from the coverage gate instead of being faked out.
+omit = ["sdr/source.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "except ImportError:",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+exclude = ["web", "vendor", "libiio", "tiles"]
+
+[tool.ruff.lint]
+# Only real errors: syntax, undefined names, f-string problems.
+# Style rules stay off so the gate does not fight existing code.
+select = ["E9", "F63", "F7", "F82"]

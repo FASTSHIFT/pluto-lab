@@ -221,3 +221,22 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---- pluto-lab ----
+# 运行时下载/安装的东西，不进版本库
+vendor/
+libiio/
+web/
+tiles/
+edgeprof/
+.venv/
+__pycache__/
+*.pyc
+
+# 运行产物
+*.png
+*.wav
+*.csv
+*.npz
+*.iq
+!docs/screenshots/*.png

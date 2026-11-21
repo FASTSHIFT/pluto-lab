@@ -1,0 +1,18 @@
+# PlutoSDR 驱动与依赖
+#
+# 注意版本锁定：libiio 的 DLL 是 0.25，必须配 pylibiio 0.25。
+# pylibiio 1.0 换成了 libiio v1.x 的 API，和 0.25 的 DLL 符号对不上，
+# 会报 "Could not find libiio C library"。
+pyadi-iio==0.0.21
+pylibiio==0.25
+
+numpy>=1.23
+
+# 可选：音频解调滤波（缺失时退化成滑动平均，音质差一点）
+scipy>=1.10
+
+# 可选：出图
+matplotlib>=3.6
+
+# 可选：跑测试
+pytest>=7.0

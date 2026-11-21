@@ -1,0 +1,54 @@
+#!/bin/sh
+# pre-commit hook - fast checks over what is about to be committed.
+#
+#  1. every .py file still compiles
+#  2. sources contain no Chinese characters
+#  3. files stay under the line limit
+#  4. unit tests pass with coverage
+#  5. ruff check + ruff format --check
+#
+# Heavy work (multi-platform matrix, hardware runs) stays in CI.
+# Bypass with: git commit --no-verify
+
+set -u
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT" || exit 1
+
+PY=""
+for p in python python3; do
+    command -v "$p" >/dev/null 2>&1 && PY="$p" && break
+done
+if [ -z "$PY" ] && command -v py >/dev/null 2>&1; then
+    PY="py -3"
+fi
+if [ -z "$PY" ]; then
+    echo "[pre-commit] python not found, skipping" >&2
+    exit 0
+fi
+
+fail=0
+run() {
+    name="$1"; shift
+    if ! "$@" >/tmp/plutolab_precommit.log 2>&1; then
+        echo "[pre-commit] FAIL: $name"
+        tail -20 /tmp/plutolab_precommit.log | sed 's/^/    /'
+        fail=1
+    fi
+}
+
+run "byte-compile"  $PY -m compileall -q sdr tools scripts tests
+run "english only"  $PY scripts/check_no_chinese.py --quiet
+run "line limit"    $PY scripts/check_file_lines.py
+run "ruff check"    $PY -m ruff check .
+run "ruff format"   $PY -m ruff format --check .
+run "tests"         $PY -m pytest -q tests --cov=sdr --cov-fail-under=85
+
+if [ "$fail" -ne 0 ]; then
+    echo ""
+    echo "  fix the issues above, or use: git commit --no-verify"
+    exit 1
+fi
+
+echo "[pre-commit] OK"
+exit 0
