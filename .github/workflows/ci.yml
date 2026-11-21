@@ -22,7 +22,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Commit messages (Conventional Commits, English only)
         shell: bash
@@ -32,14 +32,21 @@ jobs:
             RANGE="origin/${{ github.base_ref }}..${{ github.event.pull_request.head.sha }}"
           else
             BEFORE="${{ github.event.before }}"
-            if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
-              RANGE="HEAD~1..HEAD"
+            AFTER="${{ github.sha }}"
+            # A force push (or a rewritten history) leaves `before` unreachable,
+            # so fall back to validating the whole history. The root commit is
+            # exempt, which keeps this cheap and always resolvable.
+            if [ -n "$BEFORE" ] \
+               && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] \
+               && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              RANGE="${BEFORE}..${AFTER}"
             else
-              RANGE="$BEFORE..${{ github.sha }}"
+              echo "::notice::previous head is unreachable (force push?), checking the full history"
+              RANGE="HEAD"
             fi
           fi
-          echo "range: $RANGE"
-          python scripts/check_commit_msg.py --range "$RANGE" || {
+          echo "range: ${RANGE}"
+          python scripts/check_commit_msg.py --range "${RANGE}" || {
             echo "::error::commit message rejected"
             exit 1
           }
@@ -52,7 +59,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install tools
         run: pip install ruff
@@ -69,39 +76,26 @@ jobs:
       - name: File line limit
         run: python scripts/check_file_lines.py
 
+      - name: Tool boundaries
+        run: python -m pytest -q tests/test_architecture.py -v
+
   # ---------------------------------------------------------------- tests
+  # One combination on purpose: these are pure-python logic tests and the goal
+  # is a fast gate, not a compatibility matrix. Add runners back only when a
+  # Windows-specific bug actually shows up.
   test:
-    name: test (${{ matrix.os }}, py${{ matrix.python }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-        python: ["3.10", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-
-      - name: Install
-        run: |
-          python -m pip install --upgrade pip
-          pip install numpy pytest pytest-cov ruff
-
-      - name: Unit tests with coverage
-        run: python -m pytest -q tests --cov=sdr --cov-report=term-missing --cov-fail-under=85
-
-  # ---------------------------------------------------------------- boundaries
-  boundaries:
-    name: Tool boundaries
+    name: Tests (ubuntu, py3.12)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-      - run: pip install numpy pytest
-      - name: Tools must not import each other
-        run: python -m pytest -q tests/test_architecture.py -v
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy pytest pytest-cov
+
+      - name: Unit tests with coverage
+        run: python -m pytest -q tests --cov=sdr --cov-report=term-missing --cov-fail-under=85
